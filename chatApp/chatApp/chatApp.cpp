@@ -90,7 +90,6 @@ int main()
 		send(clientSocket, buf, bytesReceived + 1, 0);
 	}
 
-
 	// Close the socket
 	closesocket(clientSocket);
 
