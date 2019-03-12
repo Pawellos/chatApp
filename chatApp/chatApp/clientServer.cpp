@@ -20,7 +20,7 @@ TCPserver::TCPserver()
 
 //TCPserver::~TCPserver()
 //{
-//	WSACleanup();
+//	WSACleanup(); 
 //}
 
 bool TCPserver::init()

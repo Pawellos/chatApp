@@ -36,7 +36,7 @@ public:
 	void sendMsg(int clientSocket, std::string msg);
 	//Clean up
 	void cleanup();
-	
+
 }; 
 
 
