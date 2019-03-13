@@ -17,7 +17,7 @@ class TCPserver
 private:
 	int m_port;
 	std::string m_ipAddress;
-	MessageReceivedHandler MessageReceived; 
+	MessageReceivedHandler MessageReceived;
 public:
 	//constructor default
 	TCPserver();
@@ -30,14 +30,16 @@ public:
 	//Wait for connection
 	SOCKET waitForConnection(SOCKET listening);
 	//Receive loop
-	//The main processing loop
+	//The main processing loop for echo server
 	void run();
+	//The main processing loop for multiple clients server
+	void run_multiple();
 	//Send back message
 	void sendMsg(int clientSocket, std::string msg);
-	//Clean up
+	//Clean up 
 	void cleanup();
 
-}; 
+};
 
 
 class TCPclient
@@ -45,14 +47,18 @@ class TCPclient
 private:
 	int m_port;
 	std::string m_ipAddress;
-
+	MessageReceivedHandler MessageReceived;
 public:
+	//constructor
+	TCPclient(std::string ipAddress, int port, MessageReceivedHandler handler);
 	//Initialize winsock
 	bool init();
 	//Create a winsock 
 	SOCKET createSocket();
 	// Connect to server 
-	void connectClientServer();
+	SOCKET connectClientServer(SOCKET sock);
+	//Run send and recv message
+	void run();
 	//close down everything
 	void close();
 };
