@@ -17,20 +17,19 @@ void Listener_MessageReceived(TCPserver* listener, int client, string msg);
 int main()
 {
 	/////////////////////// SERVER //////////////////////////////////
-	//TCPserver server("127.0.0.1", 54000, Listener_MessageReceived);
+	TCPserver server("127.0.0.1", 54000, Listener_MessageReceived);
 
-	//if (server.init())
-	//{ 
-	//	server.run_multiple();
-	//}
+	if (server.init())
+	{ 
+		server.run_multiple();
+	}
+	/////////////////////// CLIENT //////////////////////////////////
+	TCPclient client("127.0.0.1", 54000);
 
-	TCPclient client("127.0.0.1", 54000, Listener_MessageReceived);
 	if (client.init())
 	{
 		client.run();
 	}
-
-
 	////////////////////////////////////////////////////////////////
 
 	cin.get();

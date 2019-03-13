@@ -149,7 +149,6 @@ void TCPserver::run_multiple()
 					//drop the client 
 					closesocket(sock);
 					FD_CLR(sock, &master);
-
 				}
 				else
 				{
@@ -181,8 +180,8 @@ void TCPserver::cleanup()
 	WSACleanup();
 }
 
-TCPclient::TCPclient(std::string ipAddress, int port, MessageReceivedHandler handler)
-	: m_ipAddress(ipAddress), m_port(port), MessageReceived(handler)
+TCPclient::TCPclient(std::string ipAddress, int port)
+	: m_ipAddress(ipAddress), m_port(port)
 {
 }
 
@@ -211,15 +210,27 @@ SOCKET TCPclient::createSocket()
 	else
 	{
 		std::cerr << "Creating socket failed! - #" << WSAGetLastError() << std::endl;
-		WSACleanup();
+		closeSock(sock);
 		return -1;
 	}
 }
 
-SOCKET TCPclient::connectClientServer(SOCKET sock)
+int TCPclient::connectClientServer(SOCKET sock)
 {
-	SOCKET client = connect(sock, NULL, NULL);
-	return client;
+	sockaddr_in hint;
+	hint.sin_family = AF_INET;
+	hint.sin_port = htons(m_port);
+	inet_pton(AF_INET, m_ipAddress.c_str(), &hint.sin_addr);
+
+	int connResult = connect(sock, (sockaddr*)&hint, sizeof(hint));
+	if (connResult == SOCKET_ERROR)
+	{
+		std::cerr << "Connect to server failed! - Error #" << WSAGetLastError() << std::endl;
+		closeSock(sock);
+		return -1;
+	}
+	else
+		return connResult;
 }
 
 void TCPclient::run()
@@ -230,18 +241,10 @@ void TCPclient::run()
 	SOCKET sock = createSocket();
 		if (sock == INVALID_SOCKET)
 		{
-			//cleanup();
+			closeSock(sock);
 		}
 		//Connect to server
-		SOCKET client = connectClientServer(sock);
-		int connResult = client;
-		if (connResult == SOCKET_ERROR)
-		{
-			std::cerr << "Connect to server failed! - Error #" << WSAGetLastError() << std::endl;
-			closesocket(client);
-			WSACleanup();
-		}
-
+		connectClientServer(sock);
 	// Do-while loop to send and receive data 
 	std::string userInput;
 
@@ -255,12 +258,12 @@ void TCPclient::run()
 		if (userInput.size() > 0)
 		{
 			// Send the text
-			int sendResult = send(client, userInput.c_str(), userInput.size() + 1, 0);
+			int sendResult = send(sock, userInput.c_str(), userInput.size() + 1, 0);
 			if (sendResult != SOCKET_ERROR)
 			{
 				// Wait for response
 				ZeroMemory(buf, MAX_BUFFER_SIZE);
-				int bytesReceived = recv(client, buf, MAX_BUFFER_SIZE, 0);
+				int bytesReceived = recv(sock, buf, MAX_BUFFER_SIZE, 0);
 				if (bytesReceived > 0)
 				{
 					// Echo response to console
@@ -269,11 +272,11 @@ void TCPclient::run()
 			}
 		}
 	} while (userInput.size() > 0);
-	WSACleanup();
+	closeSock(sock);
 }
 
-void TCPclient::close()
+void TCPclient::closeSock(SOCKET sock)
 {
-	//closesocket(sock); 
-	//WSACleanup();
+	closesocket(sock); 
+	WSACleanup();
 }
