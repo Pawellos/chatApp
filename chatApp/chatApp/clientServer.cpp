@@ -36,9 +36,9 @@ bool TCPserver::init()
 SOCKET TCPserver::createSocket()
 {
 	// Create a socket
-	SOCKET listening = socket(AF_INET, SOCK_STREAM, 0); 
+	SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening != INVALID_SOCKET)
-	{ 
+	{
 		sockaddr_in hint;
 		hint.sin_family = AF_INET;
 		hint.sin_port = htons(m_port);
@@ -48,12 +48,12 @@ SOCKET TCPserver::createSocket()
 		if (bindOk != SOCKET_ERROR)
 		{
 			int listenOk = listen(listening, SOMAXCONN);
-			if(listenOk == SOCKET_ERROR)
+			if (listenOk == SOCKET_ERROR)
 			{
 				return -1;
 			}
 		}
-		else 
+		else
 		{
 			return -1;
 		}
@@ -85,6 +85,7 @@ void TCPserver::run()
 		if (client != INVALID_SOCKET)
 		{
 			closesocket(listening);
+			//Loop receive/ send
 			int bytesReceived = 0;
 			do
 			{
@@ -100,9 +101,73 @@ void TCPserver::run()
 			} while (bytesReceived > 0);
 			closesocket(client);
 		}
-		
-		//Loop receive/ send
+	}
+}
 
+void TCPserver::run_multiple()
+{
+	char buf[MAX_BUFFER_SIZE];
+
+	//Create a listening socket
+	SOCKET listening = createSocket();
+	if (listening == INVALID_SOCKET)
+	{
+		cleanup();
+	}
+	listen(listening, SOMAXCONN);
+
+	fd_set master;
+	FD_ZERO(&master);
+	FD_SET(listening, &master);
+
+	while (true)
+	{
+		fd_set copy = master;
+		int socketCount = select(0, &copy, nullptr, nullptr, nullptr);
+		for (int i = 0; i < socketCount; i++)
+		{
+			SOCKET sock = copy.fd_array[i];
+			if (sock == listening)
+			{
+				// Accept a new connection
+				SOCKET client = accept(listening, nullptr, nullptr);
+				// Add new connection to the list of connected clients
+				FD_SET(client, &master);
+				// Send a welcone message to the connected client
+				std::string welconeMsg = "Welcome on chat server! \r\n";
+				send(client, welconeMsg.c_str(), welconeMsg.size() + 1, 0);
+			}
+			else
+			{
+				//char buf[4096];
+				ZeroMemory(buf, MAX_BUFFER_SIZE);
+
+				//Receive message 
+				int bytesIn = recv(sock, buf, MAX_BUFFER_SIZE, 0);
+				if (bytesIn <= 0)
+				{
+					//drop the client 
+					closesocket(sock);
+					FD_CLR(sock, &master);
+
+				}
+				else
+				{
+					// Send message to other clients, and definiaetly NOT listening socket
+					for (int i = 0; i < master.fd_count; i++)
+					{
+						SOCKET outSock = master.fd_array[i];
+						if (outSock != listening && outSock != sock)
+						{
+							std::ostringstream ss;
+							ss << "SOCKET #" << sock << ": " << buf << "\r";
+							std::string strOut = ss.str();
+							send(outSock, strOut.c_str(), strOut.size() + 1, 0);
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -114,6 +179,11 @@ void TCPserver::sendMsg(int clientSocket, std::string msg)
 void TCPserver::cleanup()
 {
 	WSACleanup();
+}
+
+TCPclient::TCPclient(std::string ipAddress, int port, MessageReceivedHandler handler)
+	: m_ipAddress(ipAddress), m_port(port), MessageReceived(handler)
+{
 }
 
 bool TCPclient::init()
@@ -140,29 +210,70 @@ SOCKET TCPclient::createSocket()
 	}
 	else
 	{
+		std::cerr << "Creating socket failed! - #" << WSAGetLastError() << std::endl;
 		WSACleanup();
 		return -1;
 	}
 }
 
-void TCPclient::connectClientServer()
+SOCKET TCPclient::connectClientServer(SOCKET sock)
 {
-	//int connResult = connect(sock, (sockaddr*)&hint, sizeof(hint));
-	//if (connResult != SOCKET_ERROR)
-	//{
-	//	
-	//	return connResult;
-	//}
-	//else
-	//{
-	//	closesocket(sock);
-	//	WSACleanup();
-	//	return -1;
-	//}
+	SOCKET client = connect(sock, NULL, NULL);
+	return client;
+}
+
+void TCPclient::run()
+{
+	char buf[MAX_BUFFER_SIZE];
+
+	//Create a listening socket
+	SOCKET sock = createSocket();
+		if (sock == INVALID_SOCKET)
+		{
+			//cleanup();
+		}
+		//Connect to server
+		SOCKET client = connectClientServer(sock);
+		int connResult = client;
+		if (connResult == SOCKET_ERROR)
+		{
+			std::cerr << "Connect to server failed! - Error #" << WSAGetLastError() << std::endl;
+			closesocket(client);
+			WSACleanup();
+		}
+
+	// Do-while loop to send and receive data 
+	std::string userInput;
+
+	do
+	{
+		// Promt the user for some text
+		std::cout << "> ";
+		getline(std::cin, userInput);
+		//std::cin >> userInput;
+
+		if (userInput.size() > 0)
+		{
+			// Send the text
+			int sendResult = send(client, userInput.c_str(), userInput.size() + 1, 0);
+			if (sendResult != SOCKET_ERROR)
+			{
+				// Wait for response
+				ZeroMemory(buf, MAX_BUFFER_SIZE);
+				int bytesReceived = recv(client, buf, MAX_BUFFER_SIZE, 0);
+				if (bytesReceived > 0)
+				{
+					// Echo response to console
+					std::cout << "SERVER " << std::string(buf, 0, bytesReceived) << std::endl;
+				}
+			}
+		}
+	} while (userInput.size() > 0);
+	WSACleanup();
 }
 
 void TCPclient::close()
 {
-	//closesocket(sock);
+	//closesocket(sock); 
 	//WSACleanup();
 }
