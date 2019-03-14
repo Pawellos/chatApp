@@ -27,6 +27,8 @@ public:
 	bool init();
 	//Create a winsock 
 	SOCKET createSocket();
+	//Bind socket with IP/port 
+	SOCKET bindSocket(SOCKET listening);
 	//Wait for connection
 	SOCKET waitForConnection(SOCKET listening);
 	//The main processing loop for echo server
@@ -35,6 +37,8 @@ public:
 	void run_multiple();
 	//Send back message
 	void sendMsg(int clientSocket, std::string msg);
+	//Receive data
+	void recvData(SOCKET client);
 	//Clean up 
 	void cleanup();
 
@@ -43,6 +47,7 @@ public:
 
 class TCPclient
 {
+	friend class TCPpresenter;
 private:
 	int m_port;
 	std::string m_ipAddress;
@@ -57,6 +62,23 @@ public:
 	int connectClientServer(SOCKET sock);
 	//Run send and recv message
 	void run();
+	//Send and receive data in loop
+	void send_recv_data(SOCKET sock);
+	//Receive data
+	void recvData(SOCKET client);
 	//close down everything
 	void closeSock(SOCKET sock);
+};
+
+class TCPpresnter
+{
+	friend class TCPclient;
+private:
+
+
+
+public:
+	static void echoResponse(char * buffer, int sizeRecv);
+	static void promtUser(std::string user);
+
 };

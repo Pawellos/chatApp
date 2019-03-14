@@ -4,6 +4,7 @@
 #include <string>
 #include <WinSock2.h>
 #include <ws2tcpip.h>
+#include <thread>
 #include <sstream>
 #include "clientServer.h"
 #pragma comment(lib, "Ws2_32.lib")
@@ -39,26 +40,33 @@ SOCKET TCPserver::createSocket()
 	SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening != INVALID_SOCKET)
 	{
-		sockaddr_in hint;
-		hint.sin_family = AF_INET;
-		hint.sin_port = htons(m_port);
-		inet_pton(AF_INET, m_ipAddress.c_str(), &hint.sin_addr);
-		// Bind the socket to an IP address and port 
-		int bindOk = bind(listening, (sockaddr*)&hint, sizeof(hint));
-		if (bindOk != SOCKET_ERROR)
-		{
-			int listenOk = listen(listening, SOMAXCONN);
-			if (listenOk == SOCKET_ERROR)
-			{
-				return -1;
-			}
-		}
-		else
+		SOCKET sock = bindSocket(listening);
+		return sock;
+	}
+}
+
+SOCKET TCPserver::bindSocket(SOCKET listening)
+{
+	sockaddr_in hint;
+	hint.sin_family = AF_INET;
+	hint.sin_port = htons(m_port);
+	inet_pton(AF_INET, m_ipAddress.c_str(), &hint.sin_addr);
+	// Bind the socket to an IP address and port 
+	int bindOk = bind(listening, (sockaddr*)&hint, sizeof(hint));
+	if (bindOk != SOCKET_ERROR)
+	{
+		int listenOk = listen(listening, SOMAXCONN);
+		if (listenOk == SOCKET_ERROR)
 		{
 			return -1;
 		}
-		return listening;
 	}
+	else
+	{
+		return -1;
+	}
+
+	return listening;
 }
 
 SOCKET TCPserver::waitForConnection(SOCKET listening)
@@ -70,15 +78,13 @@ SOCKET TCPserver::waitForConnection(SOCKET listening)
 
 void TCPserver::run()
 {
-	char buf[MAX_BUFFER_SIZE];
-
 	while (true)
 	{
 		//Create a listening socket
 		SOCKET listening = createSocket();
 		if (listening == INVALID_SOCKET)
 		{
-			break;
+			cleanup();
 		}
 		//Wait for connection
 		SOCKET client = waitForConnection(listening);
@@ -86,19 +92,7 @@ void TCPserver::run()
 		{
 			closesocket(listening);
 			//Loop receive/ send
-			int bytesReceived = 0;
-			do
-			{
-				ZeroMemory(buf, MAX_BUFFER_SIZE);
-				bytesReceived = recv(client, buf, MAX_BUFFER_SIZE, 0);
-				if (bytesReceived > 0)
-				{
-					if (MessageReceived != NULL)
-					{
-						MessageReceived(this, client, std::string(buf, 0, bytesReceived));
-					}
-				}
-			} while (bytesReceived > 0);
+			recvData(client);
 			closesocket(client);
 		}
 	}
@@ -139,7 +133,6 @@ void TCPserver::run_multiple()
 			}
 			else
 			{
-				//char buf[4096];
 				ZeroMemory(buf, MAX_BUFFER_SIZE);
 
 				//Receive message 
@@ -173,6 +166,24 @@ void TCPserver::run_multiple()
 void TCPserver::sendMsg(int clientSocket, std::string msg)
 {
 	send(clientSocket, msg.c_str(), msg.size() + 1, 0);
+}
+
+void TCPserver::recvData(SOCKET client)
+{
+	char buf[MAX_BUFFER_SIZE];
+	int bytesReceived = 0;
+	do
+	{
+		ZeroMemory(buf, MAX_BUFFER_SIZE);
+		bytesReceived = recv(client, buf, MAX_BUFFER_SIZE, 0);
+		if (bytesReceived > 0)
+		{
+			if (MessageReceived != NULL)
+			{
+				MessageReceived(this, client, std::string(buf, 0, bytesReceived));
+			}
+		}
+	} while (bytesReceived > 0);
 }
 
 void TCPserver::cleanup()
@@ -235,24 +246,28 @@ int TCPclient::connectClientServer(SOCKET sock)
 
 void TCPclient::run()
 {
-	char buf[MAX_BUFFER_SIZE];
-
 	//Create a listening socket
 	SOCKET sock = createSocket();
-		if (sock == INVALID_SOCKET)
-		{
+	if (sock == INVALID_SOCKET)
+	{
 			closeSock(sock);
-		}
-		//Connect to server
-		connectClientServer(sock);
+	}
+	//Connect to server
+	connectClientServer(sock);
+	//send and receive data 
+	send_recv_data(sock);
+	//Close socket
+	closeSock(sock);
+}
+
+void TCPclient::send_recv_data(SOCKET sock)
+{
 	// Do-while loop to send and receive data 
 	std::string userInput;
-
 	do
 	{
 		// Promt the user for some text
-		std::cout << "> ";
-		getline(std::cin, userInput);
+		TCPpresnter::promtUser(userInput);
 		//std::cin >> userInput;
 
 		if (userInput.size() > 0)
@@ -261,22 +276,38 @@ void TCPclient::run()
 			int sendResult = send(sock, userInput.c_str(), userInput.size() + 1, 0);
 			if (sendResult != SOCKET_ERROR)
 			{
-				// Wait for response
-				ZeroMemory(buf, MAX_BUFFER_SIZE);
-				int bytesReceived = recv(sock, buf, MAX_BUFFER_SIZE, 0);
-				if (bytesReceived > 0)
-				{
-					// Echo response to console
-					std::cout << "SERVER " << std::string(buf, 0, bytesReceived) << std::endl;
-				}
+				recvData(sock);
 			}
 		}
 	} while (userInput.size() > 0);
-	closeSock(sock);
+}
+
+void TCPclient::recvData(SOCKET client)
+{
+	char buf[MAX_BUFFER_SIZE];
+	// Wait for response
+	ZeroMemory(buf, MAX_BUFFER_SIZE);
+	int bytesReceived = recv(client, buf, MAX_BUFFER_SIZE, 0);
+	if (bytesReceived > 0)
+	{
+		// Echo response to console
+		TCPpresnter::echoResponse(buf, bytesReceived);
+	}
 }
 
 void TCPclient::closeSock(SOCKET sock)
 {
 	closesocket(sock); 
 	WSACleanup();
+}
+
+void TCPpresnter::echoResponse(char * buffer, int sizeRecv)
+{
+	std::cout << "SERVER " << std::string(buffer, 0, sizeRecv) << std::endl;
+}
+
+void TCPpresnter::promtUser(std::string user)
+{
+	std::cout << "> ";
+	getline(std::cin, user);
 }
