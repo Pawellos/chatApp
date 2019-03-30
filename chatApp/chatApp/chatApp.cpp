@@ -3,102 +3,68 @@
 
 #include "stdafx.h"
 #include <iostream>
+#include <string>
 #include <WinSock2.h>
 #include <ws2tcpip.h>
-
+#include <thread>
+#include <sstream>
+#include "clientServer.h"
 #pragma comment(lib, "Ws2_32.lib")
 
 using namespace std;
 
+void Listener_MessageReceived(TCPserver* listener, int client, string msg);
+
+void runServer(TCPserver s)
+{
+	cout << "serwer start! \r\n";
+	s.run_multiple();
+};
+
+void runClient(TCPclient s)
+{
+	cout << "client start \r\n";
+	s.run();
+};
+
 int main()
 {
-	/////////////////////// SERVER /////////////////////////////
-	// Initialize Winsock
-	WSADATA wsData;
+//	thread secondClient; 
+	/////////////////////// SERVER //////////////////////////////////
+	TCPserver server("127.0.0.1", 54000, Listener_MessageReceived);
 
-	int iResult;
-	iResult = WSAStartup(MAKEWORD(2, 2), &wsData);
-	if (iResult != 0) {
-		cerr << "Initialize winsock failed! - Exit" << endl;
-		return 1;
+	
+	if (server.init())
+	{ 
+		server.run_multiple();
+		//thread mainServer(runServer, server);
+		//mainServer.join();
 	}
 
-	// Create a socket
-	SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
-	if (listening == INVALID_SOCKET)
-	{
-		cerr << "Creating socket failed! - Exit" << endl;
-		return 1;
-	}
+	///////////////////////// CLIENT //////////////////////////////////
+	TCPclient client("127.0.0.1", 54000);
 
-	// Bind the socket to an IP address and port 
-	sockaddr_in hint;
-	hint.sin_family = AF_INET;
-	hint.sin_port = htons(54000);
-	hint.sin_addr.S_un.S_addr = INADDR_ANY;
-
-	bind(listening, (sockaddr*)&hint, sizeof(hint));
-
-	// Tell Winsock the socket is for listening 
-	listen(listening, SOMAXCONN);
-
-	// Wait for a connection 
-	sockaddr_in client;
-	int clientSize = sizeof(client);
-
-	SOCKET clientSocket = accept(listening, (sockaddr*)&client, &clientSize);
-
-	char host[NI_MAXHOST]; // client's remote name
-	char service[NI_MAXSERV]; // Service the client is connect on
-	ZeroMemory(host, NI_MAXHOST);
-	ZeroMemory(service, NI_MAXSERV);
-
-	if (getnameinfo((sockaddr*)&client, sizeof(client), host, NI_MAXHOST, service, NI_MAXSERV, 0) == 0)
-	{
-		cout << host << "connect on port " << service << endl;
-	}
-	else
-	{
-		inet_ntop(AF_INET, &client.sin_addr, host, NI_MAXHOST);
-		cout << host << " connected on port " << ntohs(client.sin_port) << endl;
-	}
-
-	// Close listening socket 
-	closesocket(listening);
-
-	// While loop: accept and echo message back to client 
-	char buf[4096];
-
-	while (true)
-	{
-		ZeroMemory(buf, 4096);
-
-		//Wait for client to send data
-		int bytesReceived = recv(clientSocket, buf, 4096, 0);
-		if (bytesReceived == SOCKET_ERROR)
-		{
-			cerr << "Error in recv() - Exit" << endl;
-			break;
-		}
-		if (bytesReceived == 0)
-		{
-			cout << "Client Disconnected " << endl;
-			break;
-		}
-
-		//Echo message back to client:
-		send(clientSocket, buf, bytesReceived + 1, 0);
-	}
-
-
-	// Close the socket
-	closesocket(clientSocket);
-
-	// Shutdown winsock
-	WSACleanup();
-	/////////////////////////////////////////////////////////
-
+	//if (client.init())
+	//{
+	//	client.run();
+	////	thread firstClient(runClient, client);
+	////	firstClient.join();
+	//}
+	////////////////////////////////////////////////////////////////
+	//server.init();
+	//thread mainServer(runServer, server);
+	//client.init();
+	//thread firstClient(runClient, client);
+	//client.init();
+	//thread secondClient(runClient, client);
+	//mainServer.join();
+	//firstClient.join();
+	//secondClient.join();
 	cin.get();
-    return 0;
+	return 0;
 }
 
+void Listener_MessageReceived(TCPserver * listener, int client, string msg)
+{
+	listener->sendMsg(client, msg);
+}
