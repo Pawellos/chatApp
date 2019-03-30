@@ -39,6 +39,8 @@ public:
 	void sendMsg(int clientSocket, std::string msg);
 	//Receive data
 	void recvData(SOCKET client);
+	//receive or send meesage for multiple server
+	void recvOrSend_multiple(SOCKET sock, fd_set master, char * buf, SOCKET listening);
 	//Clean up 
 	void cleanup();
 
@@ -80,5 +82,7 @@ private:
 public:
 	static void echoResponse(char * buffer, int sizeRecv);
 	static void promtUser(std::string user);
+	static void welcomeServer(SOCKET sock);
+	static void socketNameSender(SOCKET sock, char * buffer, SOCKET sockOut);
 
 };

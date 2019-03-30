@@ -128,36 +128,11 @@ void TCPserver::run_multiple()
 				// Add new connection to the list of connected clients
 				FD_SET(client, &master);
 				// Send a welcone message to the connected client
-				std::string welconeMsg = "Welcome on chat server! \r\n";
-				send(client, welconeMsg.c_str(), welconeMsg.size() + 1, 0);
+				TCPpresnter::welcomeServer(client);
 			}
 			else
 			{
-				ZeroMemory(buf, MAX_BUFFER_SIZE);
-
-				//Receive message 
-				int bytesIn = recv(sock, buf, MAX_BUFFER_SIZE, 0);
-				if (bytesIn <= 0)
-				{
-					//drop the client 
-					closesocket(sock);
-					FD_CLR(sock, &master);
-				}
-				else
-				{
-					// Send message to other clients, and definiaetly NOT listening socket
-					for (int i = 0; i < master.fd_count; i++)
-					{
-						SOCKET outSock = master.fd_array[i];
-						if (outSock != listening && outSock != sock)
-						{
-							std::ostringstream ss;
-							ss << "SOCKET #" << sock << ": " << buf << "\r";
-							std::string strOut = ss.str();
-							send(outSock, strOut.c_str(), strOut.size() + 1, 0);
-						}
-					}
-				}
+				recvOrSend_multiple(sock, master, buf, listening);
 			}
 		}
 	}
@@ -184,6 +159,32 @@ void TCPserver::recvData(SOCKET client)
 			}
 		}
 	} while (bytesReceived > 0);
+}
+
+void TCPserver::recvOrSend_multiple(SOCKET sock, fd_set master, char * buf, SOCKET listening)
+{
+	ZeroMemory(buf, MAX_BUFFER_SIZE);
+
+	//Receive message 
+	int bytesIn = recv(sock, buf, MAX_BUFFER_SIZE, 0);
+	if (bytesIn <= 0)
+	{
+		//drop the client 
+		closesocket(sock);
+		FD_CLR(sock, &master);
+	}
+	else
+	{
+		// Send message to other clients, and definiaetly NOT listening socket
+		for (int i = 0; i < master.fd_count; i++)
+		{
+			SOCKET outSock = master.fd_array[i];
+			if (outSock != listening && outSock != sock)
+			{
+				TCPpresnter::socketNameSender(sock, buf, outSock);
+			}
+		}
+	}
 }
 
 void TCPserver::cleanup()
@@ -268,8 +269,6 @@ void TCPclient::send_recv_data(SOCKET sock)
 	{
 		// Promt the user for some text
 		TCPpresnter::promtUser(userInput);
-		//std::cin >> userInput;
-
 		if (userInput.size() > 0)
 		{
 			// Send the text
@@ -310,4 +309,18 @@ void TCPpresnter::promtUser(std::string user)
 {
 	std::cout << "> ";
 	getline(std::cin, user);
+}
+
+void TCPpresnter::welcomeServer(SOCKET sock)
+{
+	std::string welconeMsg = "Welcome on chat server! \r\n";
+	send(sock, welconeMsg.c_str(), welconeMsg.size() + 1, 0);
+}
+
+void TCPpresnter::socketNameSender(SOCKET sock, char * buffer, SOCKET sockOut)
+{
+	std::ostringstream ss;
+	ss << "SOCKET #" << sock << ": " << buffer << "\r";
+	std::string strOut = ss.str();
+	send(sockOut, strOut.c_str(), strOut.size() + 1, 0);
 }
