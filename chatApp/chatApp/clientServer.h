@@ -27,6 +27,8 @@ public:
 	bool init();
 	//Create a winsock 
 	SOCKET createSocket();
+	//Bind socket with IP/port 
+	SOCKET bindSocket(SOCKET listening);
 	//Wait for connection
 	SOCKET waitForConnection(SOCKET listening);
 	//The main processing loop for echo server
@@ -35,6 +37,10 @@ public:
 	void run_multiple();
 	//Send back message
 	void sendMsg(int clientSocket, std::string msg);
+	//Receive data
+	void recvData(SOCKET client);
+	//receive or send meesage for multiple server
+	void recvOrSend_multiple(SOCKET sock, fd_set master, char * buf, SOCKET listening);
 	//Clean up 
 	void cleanup();
 
@@ -43,6 +49,7 @@ public:
 
 class TCPclient
 {
+	//friend class TCPpresenter;
 private:
 	int m_port;
 	std::string m_ipAddress;
@@ -57,6 +64,35 @@ public:
 	int connectClientServer(SOCKET sock);
 	//Run send and recv message
 	void run();
+	//Send and receive data in loop
+	void send_recv_data(SOCKET sock);
+	//Receive data
+	void recvData(SOCKET client);
 	//close down everything
 	void closeSock(SOCKET sock);
+};
+
+class TCPpresenter
+{
+private:
+
+
+
+public:
+	virtual void echoResponse(char * buffer, int sizeRecv) = 0;
+	virtual void promtUser(std::string user) = 0;
+	virtual void welcomeServer(SOCKET sock) = 0;
+	virtual void socketNameSender(SOCKET sock, char * buffer, SOCKET sockOut) = 0;
+
+};
+
+class TCPcommandLinePresenter : public TCPpresenter
+{
+private:
+
+public:
+	void echoResponse(char * buffer, int sizeRecv);
+	void promtUser(std::string user);
+	void welcomeServer(SOCKET sock);
+	void socketNameSender(SOCKET sock, char * buffer, SOCKET sockOut);
 };
